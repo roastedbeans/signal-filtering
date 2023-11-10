@@ -1,0 +1,305 @@
+#Name: Vincent D. Abella
+
+#ID: 18101371
+
+#Date Modified: May 5, 2023
+
+################################################################
+
+#Title: ABELLA_NotchNoiseFiltering
+
+################################################################
+
+#Description:
+
+#The code is developed to INPUT an audio file, filter the noise,
+
+#and output the filtered audio file.
+
+#The code is designed to work with mono (single-channel)
+
+#audio signals, and can be modified to work with stereo
+
+#(dual-channel) signals by processing each channel separately.
+
+#The code also includes comments to explain each step
+
+#of the algorithm and make it easier to understand and modify.
+
+################################################################
+
+IMPORT numpy as np
+
+IMPORT matplotlib.pyplot as plt
+
+IMPORT scipy.signal as signal
+
+IMPORT soundfile as sf
+
+IMPORT tkinter as tk
+
+from tkinter IMPORT filedialog, messagebox
+
+
+
+DEFINE CLASS AudioFilterGUI:
+
+    DEFINE FUNCTION __init__(self, master):
+
+        SET self.master TO master
+
+        SET self.data TO None
+
+        SET self.sr TO None
+
+        SET self.filtered_data TO None
+
+        SET self.freq_start TO tk.DoubleVar(value=500.0)
+
+        SET self.freq_end TO tk.DoubleVar(value=12000.0)
+
+
+
+        # Create button to load audio file
+
+        SET self.load_button TO tk.Button(master, text="Load Audio", command=self.load_audio)
+
+        self.load_button.pack(padx=20, pady=5)
+
+
+
+        # Create button to plot original signal
+
+        SET self.plot_button TO tk.Button(master, text="Plot Signal", command=self.plot)
+
+        self.plot_button.pack(padx=20, pady=5)
+
+
+
+        # Create button to filter audio file
+
+        SET self.filter_button TO tk.Button(master, text="Filter Audio", command=self.filter_audio)
+
+        self.filter_button.pack(padx=20, pady=5)
+
+
+
+        # Create button to export filtered audio file
+
+        SET self.export_button TO tk.Button(master, text="Export Audio", command=self.export_audio)
+
+        self.export_button.pack(padx=20, pady=5)
+
+
+
+        # Create entry FOR start frequency of noise band
+
+        tk.Label(master, text="Start Frequency (Hz)").pack()
+
+        SET self.freq_start_entry TO tk.Entry(master, textvariable=self.freq_start)
+
+        self.freq_start_entry.pack(padx=30, pady=10)
+
+
+
+        # Create entry FOR end frequency of noise band
+
+        tk.Label(master, text="End Frequency (Hz)").pack()
+
+        SET self.freq_end_entry TO tk.Entry(master, textvariable=self.freq_end)
+
+        self.freq_end_entry.pack(padx=30, pady=10)
+
+
+
+    DEFINE FUNCTION load_audio(self):
+
+        # Open file dialog to select audio file
+
+        SET filename TO filedialog.askopenfilename(initialdir="./", title="Select Audio File", filetypes=[("Audio Files", "*.wav *.mp3")])
+
+
+
+        # Load audio file
+
+        SET self.data, self.sr TO sf.read(filename)
+
+
+
+    DEFINE FUNCTION plot(self):
+
+        IF self.data is not None:
+
+            # Plot original signal
+
+            plt.figure(figsize=(12,4))
+
+            plt.plot(self.data)
+
+            plt.title('Original Signal')
+
+            plt.xlabel('Sample')
+
+            plt.ylabel('Amplitude')
+
+
+
+            # Perform FFT
+
+            SET fft_data TO np.fft.rfft(self.data)
+
+
+
+            # Compute PSD
+
+            SET psd_data TO np.abs(fft_data)**2 / len(self.data)
+
+
+
+            # Plot PSD
+
+            plt.figure(figsize=(12,4))
+
+            plt.plot(np.fft.rfftfreq(len(self.data), d=1/self.sr), psd_data)
+
+            plt.title('Power Spectral Density')
+
+            plt.xlabel('Frequency (Hz)')
+
+            plt.ylabel('Power')
+
+            plt.show()
+
+        ELSE:
+
+            tk.messagebox.showerror("Error", "No audio file selected.")
+
+
+
+    DEFINE FUNCTION filter_audio(self):
+
+        IF self.data is not None:
+
+            # Perform FFT
+
+            SET fft_data TO np.fft.rfft(self.data)
+
+
+
+            # Compute PSD
+
+            SET psd_data TO np.abs(fft_data)**2 / len(self.data)
+
+
+
+            # Set noise frequency band
+
+            SET noise_start TO self.freq_start.get() # start of noise frequency band IN Hz
+
+            SET noise_end TO self.freq_end.get() # end of noise frequency band IN Hz
+
+
+
+            # Find indices of noise frequencies
+
+            SET freqs TO np.fft.rfftfreq(len(self.data), d=1/self.sr)
+
+            SET noise_indices TO np.where((freqs >= noise_start) & (freqs <= noise_end))[0]
+
+
+
+            # Apply notch filter to noise frequencies
+
+            SET notch_filter TO np.ones(len(psd_data))
+
+            SET notch_filter[noise_indices] TO 0
+
+            SET filtered_psd_data TO psd_data * notch_filter
+
+
+
+            # Apply inverse FFT to get filtered signal
+
+            SET self.filtered_data TO np.fft.irfft(fft_data * notch_filter)
+
+
+
+            # Plot filtered signal
+
+            plt.figure(figsize=(12,4))
+
+            plt.plot(self.data, label='Original Data')
+
+            plt.plot(self.filtered_data, label='Filtered Data')
+
+            plt.title('Filtered Signal')
+
+            plt.xlabel('Sample')
+
+            plt.ylabel('Amplitude')
+
+            plt.legend()
+
+        
+
+            # Plot PSD before and after filtering
+
+            plt.figure(figsize=(12,4))
+
+            plt.plot(freqs, psd_data, label='Before Filtering')
+
+            plt.plot(freqs, filtered_psd_data, label='After Filtering')
+
+            plt.title('Power Spectral Density')
+
+            plt.xlabel('Frequency (Hz)')
+
+            plt.ylabel('Power')
+
+            plt.legend()
+
+            plt.show()
+
+        ELSE:
+
+            tk.messagebox.showerror("Error", "No audio file selected.")
+
+
+
+    DEFINE FUNCTION export_audio(self):
+
+        IF self.filtered_data is not None:
+
+            # Open file dialog
+
+            SET filename TO filedialog.asksaveasfilename(initialdir="./", title="Save Filtered Audio", defaultextension=".wav", filetypes=[("WAV Files", "*.wav")])
+
+
+
+            # Export filtered audio file
+
+            sf.write(filename, self.filtered_data, self.sr)
+
+        ELSE:
+
+            tk.messagebox.showerror("Error", "No filtered audio data available.")
+
+
+
+# Create main window
+
+SET root TO tk.Tk()
+
+root.title("Audio Filter")
+
+
+
+# Create AudioFilterGUI instance
+
+SET gui TO AudioFilterGUI(root)
+
+
+
+# Run main loop
+
+root.mainloop()
